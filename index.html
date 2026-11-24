@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prueba Diagnóstica de Pensamiento Crítico (CT v2)</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --g: #1a5d3a; --gd: #134529; --gold: #c8a040; --bg: #f2f4f2; --fg: #1e2923; --mut: #5b6760; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: var(--bg); color: var(--fg);
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
+  .card { max-width: 440px; margin: 24px 16px; padding: 32px 28px; background: #fff; border-radius: 14px;
+          border-top: 5px solid var(--g); box-shadow: 0 4px 18px rgba(16,40,26,.1); text-align: center; }
+  h1 { margin: 0 0 8px; font-size: 20px; color: var(--gd); }
+  p { margin: 0 0 14px; color: var(--mut); line-height: 1.5; font-size: 15px; }
+  .spin { width: 34px; height: 34px; margin: 6px auto 16px; border: 3px solid #d6ddd8; border-top-color: var(--g);
+          border-radius: 50%; animation: s .8s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  button { min-height: 46px; padding: 10px 24px; border: 0; border-radius: 10px; background: var(--g); color: #fff;
+           font-size: 16px; font-weight: 600; cursor: pointer; }
+  button:hover { background: var(--gd); }
+  .err { display: none; }
+  .is-error .spin { display: none; }
+  .is-error .err { display: block; }
+  .is-error .loading { display: none; }
+  small { display: block; margin-top: 14px; color: #8a948e; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="spin" aria-hidden="true"></div>
+  <div class="loading">
+    <h1>Cargando la prueba…</h1>
+    <p>Prueba Diagnóstica de Pensamiento Crítico (CT v2) · Grupo de Investigación GICED</p>
+  </div>
+  <div class="err">
+    <h1>No pudimos cargar la prueba</h1>
+    <p id="errMsg">Revisa tu conexión a internet e inténtalo de nuevo.</p>
+    <button type="button" id="retry">Intentar de nuevo</button>
+  </div>
+  <small>No necesitas iniciar sesión en ninguna cuenta.</small>
+</div>
+
+<script>
+/* =========================================================================
+   Copia pública del formulario CT v2 (fuera de Google).
+   1) Descarga el formulario desde Apps Script (?raw=1).
+   2) Reemplaza google.script.run por llamadas a la API doPost del mismo
+      Apps Script, que guarda en la misma hoja y carpetas de firmas.
+   No requiere sesión de Google: evita el bloqueo "No se puede abrir el archivo".
+   ========================================================================= */
+(function () {
+  'use strict';
+  var API = 'https://script.google.com/macros/s/AKfycbw83JDrYMMalUVJ-v9aFPmsKNFELONFeyWk2i5c6Do1IgwiuAgPPssThYpZeAoMWEI_/exec';
+  var CACHE_KEY = 'ct_v2_form_html';
+
+  // Puente que imita google.script.run usando la API JSON (doPost).
+  var SHIM = '<script>(' + function (API) {
+    function call(action, payload, ok, fail) {
+      var ctrl = ('AbortController' in window) ? new AbortController() : null;
+      var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 60000);
+      fetch(API, {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: action, payload: payload }),
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function (r) {
+        if (!r.ok) throw new Error('El servidor respondió ' + r.status);
+        return r.text();
+      }).then(function (t) {
+        clearTimeout(timer);
+        var data;
+        try { data = JSON.parse(t); } catch (e) { throw new Error('Respuesta inesperada del servidor'); }
+        if (ok) ok(data);
+      }).catch(function (e) {
+        clearTimeout(timer);
+        var msg = (e && e.name === 'AbortError') ? 'tiempo de espera agotado' : ((e && e.message) || 'error de red');
+        if (fail) fail({ message: msg });
+      });
+    }
+    function Runner(ok, fail) { this._ok = ok; this._fail = fail; }
+    Runner.prototype.withSuccessHandler = function (f) { return new Runner(f, this._fail); };
+    Runner.prototype.withFailureHandler = function (f) { return new Runner(this._ok, f); };
+    ['buscarEstudiantePorDocumento', 'uploadSignature', 'submitForm'].forEach(function (name) {
+      Runner.prototype[name] = function (arg) { call(name, arg, this._ok, this._fail); };
+    });
+    window.google = { script: { run: new Runner(null, null) } };
+  }.toString() + ')(' + JSON.stringify(API) + ');<\/script>';
+
+  // Si por alguna razón DOMContentLoaded no llegó al formulario, lo disparamos.
+  var KICK = '<script>setTimeout(function(){var f=document.getElementById("fechaDiligenciamiento");' +
+             'if(f&&!f.value){document.dispatchEvent(new Event("DOMContentLoaded"));}},1500);<\/script>';
+
+  function render(html) {
+    var out = html.replace(/<head>/i, '<head>' + SHIM);
+    out = out.replace(/<\/body>/i, KICK + '</body>');
+    document.open();
+    document.write(out);
+    document.close();
+  }
+
+  function cached() { try { return localStorage.getItem(CACHE_KEY); } catch (e) { return null; } }
+  function save(html) { try { localStorage.setItem(CACHE_KEY, html); } catch (e) {} }
+
+  function fail(msg) {
+    document.getElementById('errMsg').textContent = msg;
+    document.getElementById('card').className = 'card is-error';
+  }
+
+  function load(attempt) {
+    document.getElementById('card').className = 'card';
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 30000);
+    fetch(API + '?raw=1', { credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (html) {
+        clearTimeout(timer);
+        if (html.indexOf('diagnosticoForm') < 0) throw new Error('contenido inválido');
+        save(html);
+        render(html);
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        if (attempt < 2) { setTimeout(function () { load(attempt + 1); }, 2000); return; }
+        var c = cached();
+        if (c) { render(c); return; }
+        fail('Revisa tu conexión a internet e inténtalo de nuevo. Si estás en una red institucional, prueba con datos móviles.');
+      });
+  }
+
+  document.getElementById('retry').addEventListener('click', function () { load(0); });
+  load(0);
+})();
+</script>
+</body>
+</html>
